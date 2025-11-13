@@ -71,6 +71,7 @@ async def websocket_endpoint(websocket: WebSocket, dialog_id: int):
                 result = invoke_agent(data, chat_history)
 
                 final_answer = ""
+                # The new agent returns the answer in a different key
                 if isinstance(result.get("messages"), list) and len(result["messages"]) > 0:
                     final_answer = result["messages"][-1].content
 

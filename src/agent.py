@@ -1,5 +1,5 @@
 from langchain_openai import ChatOpenAI
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain.agents import create_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from typing import List
 from langchain_core.messages import BaseMessage
@@ -25,28 +25,22 @@ all_tools = [
     tools.list_all_notes,
 ]
 
-# 3. Create the prompt with a placeholder for chat history
-prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", "You are a helpful assistant that manages an Obsidian vault. You are conversational and will remember previous messages."),
-        MessagesPlaceholder(variable_name="chat_history"),
-        ("user", "{input}"),
-        MessagesPlaceholder(variable_name="agent_scratchpad"),
-    ]
+# 3. Create the agent using the new, simplified API
+# The create_agent function handles the prompt internally.
+# We pass the llm instance as the `model` argument.
+agent_executor = create_agent(
+    model=llm,
+    tools=all_tools,
+    system_prompt="You are a helpful assistant that manages an Obsidian vault. You are conversational and will remember previous messages."
 )
 
-# 4. Create the agent
-# We go back to the create_tool_calling_agent to have more control over the prompt
-agent = create_tool_calling_agent(llm, all_tools, prompt)
-agent_executor = AgentExecutor(agent=agent, tools=all_tools, verbose=True)
-
-
-# 5. Update invoke_agent to accept history
+# 4. Update invoke_agent to accept history
 def invoke_agent(input_text: str, chat_history: List[BaseMessage]):
     """
     Invokes the agent with input text and the conversation history.
     """
+    # The new agent executor expects a list of messages in the 'messages' key
+    messages = chat_history + [("user", input_text)]
     return agent_executor.invoke({
-        "input": input_text,
-        "chat_history": chat_history,
+        "messages": messages
     })
