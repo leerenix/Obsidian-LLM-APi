@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const chatMessages = document.getElementById("chat-messages");
     const messageForm = document.getElementById("message-form");
     const messageInput = document.getElementById("message-input");
+    const submitBtn = messageForm.querySelector("button");
     const rightPanel = document.getElementById("right-panel");
     const closeRightPanelBtn = document.getElementById("close-right-panel-btn");
     const noteContentArea = document.getElementById("note-content-area");
@@ -14,6 +15,24 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- State Management ---
     let activeDialogId = null;
     let ws = null;
+    let isLoading = false;
+
+    // --- UI State Functions ---
+    function setUiLoadingState(loading) {
+        console.log("Setting UI loading state to:", loading);
+        isLoading = loading;
+        if (loading) {
+            messageInput.disabled = true;
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Stop";
+            submitBtn.classList.add("stop-btn");
+        } else {
+            messageInput.disabled = false;
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Send";
+            submitBtn.classList.remove("stop-btn");
+        }
+    }
 
     // --- Core Functions ---
 
@@ -93,9 +112,18 @@ document.addEventListener("DOMContentLoaded", () => {
         const wsUrl = `ws://${window.location.host}/ws/${activeDialogId}`;
         ws = new WebSocket(wsUrl);
 
-        ws.onopen = () => console.log("WebSocket connection established.");
-        ws.onclose = () => console.log("WebSocket connection closed.");
-        ws.onerror = (error) => console.error("WebSocket error:", error);
+ws.onopen = () => {
+    console.log("WebSocket connection established.");
+    setUiLoadingState(false);
+};
+ws.onclose = () => {
+    console.log("WebSocket connection closed.");
+    setUiLoadingState(false);
+};
+ws.onerror = (error) => {
+    console.error("WebSocket error:", error);
+    setUiLoadingState(false);
+};
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -104,6 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // You could render a temporary status message here if desired
                 console.log("Status:", data.message);
             } else if (data.type === 'final_response') {
+                setUiLoadingState(false);
                 renderMessage('assistant', data.content);
                 // Check for note content in the full output and display it
                 if (data.full_output) {
@@ -129,7 +158,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         console.error("Error parsing tool output from full_output:", e);
                     }
                 }
+                // After a response, the title might have been updated
+                setTimeout(loadDialogs, 500); // Allow time for the title to be updated in the DB
             } else if (data.type === 'error') {
+                setUiLoadingState(false);
                 renderMessage('assistant', `Error: ${data.message}`);
             }
         };
@@ -143,9 +175,13 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderMessage(role, content) {
         const messageDiv = document.createElement("div");
         messageDiv.classList.add("message", role);
-        // Basic markdown-to-HTML conversion for links and bolding
-        let htmlContent = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+        // Use marked.parse() for robust Markdown rendering
+        let htmlContent = marked.parse(content);
+
+        // Custom handling for Obsidian-style [[links]] after markdown parsing
         htmlContent = htmlContent.replace(/\[\[(.*?)\]\]/g, '<a href="#" class="note-link" data-note="$1">$1</a>');
+
         messageDiv.innerHTML = htmlContent;
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight; // Auto-scroll to bottom
@@ -174,9 +210,17 @@ document.addEventListener("DOMContentLoaded", () => {
      */
     messageForm.addEventListener("submit", (e) => {
         e.preventDefault();
+
+        if (isLoading) {
+            if (ws) ws.close();
+            setUiLoadingState(false);
+            return;
+        }
+
         const message = messageInput.value.trim();
         if (message && activeDialogId && ws && ws.readyState === WebSocket.OPEN) {
             renderMessage('user', message);
+            setUiLoadingState(true);
             ws.send(message);
             messageInput.value = "";
         } else {

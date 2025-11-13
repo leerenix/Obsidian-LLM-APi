@@ -149,6 +149,14 @@ body, html {
     background-color: var(--hover-color);
 }
 
+#message-form button.stop-btn {
+    background-color: #dc3545; /* A red color for stop */
+}
+
+#message-form button.stop-btn:hover {
+    background-color: #c82333; /* A darker red on hover */
+}
+
 
 /* Right Panel */
 .right-panel {

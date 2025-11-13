@@ -1,8 +1,8 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from .database import create_db_and_tables
-from .agent import invoke_agent
+from .database import create_db_and_tables, Dialog
+from .agent import invoke_agent, llm as title_llm
 import logging
 from langchain_core.messages import HumanMessage, AIMessage
 
@@ -39,7 +39,7 @@ class CustomEncoder(json.JSONEncoder):
         return f"<<non-serializable: {type(o).__name__}>>"
 
 @app.websocket("/ws/{dialog_id}")
-async def websocket_endpoint(websocket: WebSocket, dialog_id: int):
+async def websocket_endpoint(websocket: WebSocket, dialog_id: int, background_tasks: BackgroundTasks):
     await websocket.accept()
     logger.info(f"WebSocket connection established for dialog {dialog_id}.")
 
@@ -48,12 +48,18 @@ async def websocket_endpoint(websocket: WebSocket, dialog_id: int):
             data = await websocket.receive_text()
             logger.info(f"Received message from client for dialog {dialog_id}: {data}")
 
-            # Correctly handle DB session per message
             with next(database.get_db()) as db:
                 # Save user message
                 user_message = database.Message(dialog_id=dialog_id, role="user", content=data)
                 db.add(user_message)
                 db.commit()
+
+                # --- Title Generation on First Message ---
+                # Check if it's the first user message in the dialog
+                message_count = db.query(database.Message).filter(database.Message.dialog_id == dialog_id, database.Message.role == 'user').count()
+                if message_count == 1:
+                    background_tasks.add_task(generate_title_task, dialog_id, data, db)
+
 
             await websocket.send_json({"type": "status", "message": "Processing your request..."})
 
@@ -127,6 +133,24 @@ class DialogModel(BaseModel):
     messages: List[MessageModel] = []
 
     model_config = {"from_attributes": True}
+
+class DialogTitleUpdate(BaseModel):
+    title: str
+
+async def generate_title_task(dialog_id: int, user_message: str, db: Session):
+    try:
+        prompt = f"Generate a short, concise title (4-5 words) for a conversation that starts with this user message: '{user_message}'"
+        result = await title_llm.ainvoke(prompt)
+        new_title = result.content.strip().strip('"')
+
+        dialog = db.query(Dialog).filter(Dialog.id == dialog_id).first()
+        if dialog:
+            dialog.title = new_title
+            db.commit()
+            logger.info(f"Updated title for dialog {dialog_id} to: {new_title}")
+
+    except Exception as e:
+        logger.error(f"Error generating title for dialog {dialog_id}: {e}", exc_info=True)
 
 
 @app.post("/api/dialogs", response_model=DialogModel)

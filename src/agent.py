@@ -31,7 +31,7 @@ all_tools = [
 agent_executor = create_agent(
     model=llm,
     tools=all_tools,
-    system_prompt="You are a helpful assistant that manages an Obsidian vault. You are conversational and will remember previous messages."
+    system_prompt="You are a helpful assistant that manages an Obsidian vault. You are conversational and will remember previous messages. For non-destructive actions like searching or listing notes, proceed without asking for confirmation. For destructive actions like creating or updating notes, you must ask for confirmation unless the user has enabled 'YOLO mode'."
 )
 
 # 4. Update invoke_agent to accept history
