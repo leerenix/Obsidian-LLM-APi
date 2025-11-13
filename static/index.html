@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obsidian LLM Assistant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left Panel: Dialogs List -->
+        <div class="left-panel">
+            <div class="panel-header">
+                <h2>Conversations</h2>
+                <button id="new-dialog-btn">+</button>
+            </div>
+            <ul id="dialogs-list">
+                <!-- Dialogs will be loaded here -->
+            </ul>
+            <div class="settings">
+                <label for="yolo-toggle">YOLO Mode:</label>
+                <input type="checkbox" id="yolo-toggle">
+            </div>
+        </div>
+
+        <!-- Center Panel: Chat Interface -->
+        <div class="chat-container">
+            <div class="chat-header">
+                <h2 id="chat-title">Select a Conversation</h2>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <!-- Messages will be appended here -->
+            </div>
+            <div class="chat-input-area">
+                <form id="message-form">
+                    <textarea id="message-input" placeholder="Ask your assistant..." required></textarea>
+                    <button type="submit">Send</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right Panel: Note Viewer -->
+        <div class="right-panel" id="right-panel">
+            <div class="panel-header">
+                <h2>Note Viewer</h2>
+                <button id="close-right-panel-btn">×</button>
+            </div>
+            <div id="note-content-area">
+                <p>Note content will appear here when mentioned.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
