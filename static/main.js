@@ -31,18 +31,25 @@ document.addEventListener("DOMContentLoaded", () => {
                 const li = document.createElement("li");
                 li.textContent = dialog.title || `Conversation ${dialog.id}`;
                 li.dataset.dialogId = dialog.id;
-                if (dialog.id === activeDialogId) {
-                    li.classList.add("active");
-                }
+
                 li.addEventListener("click", () => {
-                    activeDialogId = dialog.id;
-                    loadMessages(dialog.id);
-                    // Also reset the active class on all items before setting the new one
-                    document.querySelectorAll("#dialogs-list li").forEach(item => item.classList.remove("active"));
-                    li.classList.add("active");
+                    if (activeDialogId !== dialog.id) {
+                        activeDialogId = dialog.id;
+                        loadMessages(dialog.id);
+                        document.querySelectorAll("#dialogs-list li").forEach(item => item.classList.remove("active"));
+                        li.classList.add("active");
+                    }
                 });
                 dialogsList.appendChild(li);
             });
+
+            // --- Auto-load first dialog ---
+            if (dialogs.length > 0 && activeDialogId === null) {
+                const firstDialog = dialogs[0];
+                activeDialogId = firstDialog.id;
+                loadMessages(firstDialog.id);
+                dialogsList.querySelector(`[data-dialog-id='${firstDialog.id}']`).classList.add("active");
+            }
         } catch (error) {
             console.error("Error loading dialogs:", error);
         }
