@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse
 from .database import create_db_and_tables
 from .agent import invoke_agent
 import logging
+from langchain_core.messages import HumanMessage, AIMessage
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -57,7 +58,17 @@ async def websocket_endpoint(websocket: WebSocket, dialog_id: int):
             await websocket.send_json({"type": "status", "message": "Processing your request..."})
 
             try:
-                result = invoke_agent(data)
+                # --- Fetch Chat History ---
+                history = db.query(database.Message).filter(database.Message.dialog_id == dialog_id).order_by(database.Message.created_at).all()
+                chat_history = []
+                for msg in history:
+                    if msg.role == "user":
+                        chat_history.append(HumanMessage(content=msg.content))
+                    elif msg.role == "assistant":
+                        chat_history.append(AIMessage(content=msg.content))
+
+                # --- Invoke Agent with History ---
+                result = invoke_agent(data, chat_history)
 
                 final_answer = ""
                 if isinstance(result.get("messages"), list) and len(result["messages"]) > 0:

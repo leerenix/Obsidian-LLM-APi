@@ -1,11 +1,12 @@
 from langchain_openai import ChatOpenAI
-from langchain.agents import create_agent
-from langchain_core.prompts import ChatPromptTemplate
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from typing import List
+from langchain_core.messages import BaseMessage
 from . import config
 from . import tools
 
-# 1. Initialize the custom LLM
-# The model instance is passed directly to the agent now.
+# 1. Initialize the LLM
 llm = ChatOpenAI(
     model=config.LLM_MODEL_NAME,
     api_key=config.LLM_API_KEY,
@@ -14,7 +15,7 @@ llm = ChatOpenAI(
     streaming=True,
 )
 
-# 2. Collect all the defined tools
+# 2. Collect tools
 all_tools = [
     tools.search_notes,
     tools.get_note_by_uuid,
@@ -24,25 +25,28 @@ all_tools = [
     tools.list_all_notes,
 ]
 
-# 3. Create the agent using the new, simplified API
-# The prompt is now handled internally by the create_agent function,
-# but we can pass a system prompt for customization.
-system_prompt = "You are a helpful assistant that manages an Obsidian vault. Be concise but thorough. You have access to a set of tools to interact with the vault."
-
-agent_executor = create_agent(
-    model=llm,
-    tools=all_tools,
-    system_prompt=system_prompt
+# 3. Create the prompt with a placeholder for chat history
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", "You are a helpful assistant that manages an Obsidian vault. You are conversational and will remember previous messages."),
+        MessagesPlaceholder(variable_name="chat_history"),
+        ("user", "{input}"),
+        MessagesPlaceholder(variable_name="agent_scratchpad"),
+    ]
 )
 
-# 4. Provide a simple interface to invoke the agent
-def invoke_agent(input_text: str):
+# 4. Create the agent
+# We go back to the create_tool_calling_agent to have more control over the prompt
+agent = create_tool_calling_agent(llm, all_tools, prompt)
+agent_executor = AgentExecutor(agent=agent, tools=all_tools, verbose=True)
+
+
+# 5. Update invoke_agent to accept history
+def invoke_agent(input_text: str, chat_history: List[BaseMessage]):
     """
-    Invokes the agent with a given input text and returns the result.
-    The input format for the new agent is a dictionary of messages.
+    Invokes the agent with input text and the conversation history.
     """
     return agent_executor.invoke({
-        "messages": [
-            ("user", input_text)
-        ]
+        "input": input_text,
+        "chat_history": chat_history,
     })
